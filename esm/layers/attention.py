@@ -6,7 +6,7 @@ import torch.nn.functional as F
 from torch import nn
 
 from esm.layers.rotary import RotaryEmbedding
-from flash_attention import LayerNormFn
+from flash_attn.ops.triton.layer_norm import LayerNormFn
 
 class MultiHeadAttention(nn.Module):
     def __init__(
