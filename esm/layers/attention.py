@@ -6,7 +6,6 @@ import torch.nn.functional as F
 from torch import nn
 
 from esm.layers.rotary import RotaryEmbedding
-from flash_attn.ops.triton.layer_norm import LayerNormFn
 
 class MultiHeadAttention(nn.Module):
     def __init__(
@@ -19,13 +18,13 @@ class MultiHeadAttention(nn.Module):
 
         self.d_head = self.d_model // self.n_heads
         self.layernorm_qkv = nn.Sequential(
-            LayerNormFn(d_model, torch.ones(d_model), bias=True), nn.Linear(d_model, d_model * 3, bias=bias)
+            nn.LayerNorm(d_model, bias=True), nn.Linear(d_model, d_model * 3, bias=bias)
         )
         self.out_proj = nn.Linear(d_model, d_model, bias=bias)
 
         if qk_layernorm:
-            self.q_ln = LayerNormFn(d_model, torch.ones(d_model), bias=bias)
-            self.k_ln = LayerNormFn(d_model, torch.ones(d_model), bias=bias)
+            self.q_ln = nn.LayerNorm(d_model, bias=bias)
+            self.k_ln = nn.LayerNorm(d_model, bias=bias)
         else:
             self.q_ln = nn.Identity()
             self.k_ln = nn.Identity()
