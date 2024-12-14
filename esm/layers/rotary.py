@@ -24,7 +24,7 @@ from typing import Tuple
 
 import torch
 from einops import rearrange, repeat
-
+from flash_attn.ops.triton.rotary import apply_rotary
 
 def rotate_half(x, interleaved=False):
     if not interleaved:
@@ -35,27 +35,6 @@ def rotate_half(x, interleaved=False):
         return rearrange(
             torch.stack((-x2, x1), dim=-1), "... d two -> ... (d two)", two=2
         )
-
-
-def apply_rotary_emb_torch(x, cos, sin, interleaved=False, _inplace=False):
-    """
-    x: (batch_size, seqlen, nheads, headdim)
-    cos, sin: (seqlen, rotary_dim / 2)
-    """
-    ro_dim = cos.shape[-1] * 2
-    assert ro_dim <= x.shape[-1]
-    seqlen = x.size(1)
-    cos = cos[:seqlen]
-    sin = sin[:seqlen]
-    cos = repeat(cos, "s d -> s 1 (2 d)")
-    sin = repeat(sin, "s d -> s 1 (2 d)")
-    return torch.cat(
-        [
-            x[..., :ro_dim] * cos + rotate_half(x[..., :ro_dim], interleaved) * sin,
-            x[..., ro_dim:],
-        ],
-        dim=-1,
-    )
 
 
 class RotaryEmbedding(torch.nn.Module):
@@ -202,19 +181,19 @@ class RotaryEmbedding(torch.nn.Module):
         assert self._sin_cached is not None
         if self.scale is None:
             return (
-                apply_rotary_emb_torch(
+                apply_rotary(
                     q,
                     self._cos_cached[seqlen_offset:],
                     self._sin_cached[seqlen_offset:],
-                    self.interleaved,
-                    True,  # inplace=True
+                    interleaved=self.interleaved,
+                    inplace=True,  # inplace=True
                 ),
-                apply_rotary_emb_torch(
+                apply_rotary(
                     k,
                     self._cos_cached[seqlen_offset:],
                     self._sin_cached[seqlen_offset:],
-                    self.interleaved,
-                    True,  # inplace=True
+                    interleaved=self.interleaved,
+                    inplace=True,  # inplace=True
                 ),
             )  # type: ignore
         else:
